@@ -1,17 +1,37 @@
 import { useEffect, useState } from 'react';
-import { Shield, Users, Swords, Gift, Bell, Download, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, Users, Swords, Gift, Bell, Download, CheckCircle, XCircle, TrendingUp, Zap, Activity } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../lib/api';
 
-const STATUS_COLORS = { ACTIVE: 'text-green-400', PENDING: 'text-yellow-400', INACTIVE: 'text-gray-400', BANNED: 'text-red-400' };
+const MEMBER_STATUS = {
+  ACTIVE:   { label:'Aktif',    color:'#22C55E', bg:'rgba(34,197,94,0.12)'    },
+  PENDING:  { label:'Pending',  color:'#FFB800', bg:'rgba(255,184,0,0.12)'    },
+  INACTIVE: { label:'Inaktif',  color:'#8888AA', bg:'rgba(136,136,170,0.12)'  },
+  BANNED:   { label:'Banned',   color:'#FF1721', bg:'rgba(255,23,33,0.12)'    },
+};
+
+function StatCard({ label, value, sub, color, icon: Icon }) {
+  return (
+    <div className="rounded-2xl p-4 relative overflow-hidden"
+      style={{ background: `${color}0A`, border: `1px solid ${color}20` }}>
+      <div className="absolute top-3 right-3 opacity-20">
+        <Icon size={28} style={{ color }} />
+      </div>
+      <p className="text-[10px] font-semibold text-[#8888AA] uppercase tracking-wider mb-1.5">{label}</p>
+      <p className="font-mono font-black text-[26px] leading-none" style={{ color }}>{value ?? '—'}</p>
+      {sub && <p className="text-[10px] text-[#8888AA] mt-1.5">{sub}</p>}
+    </div>
+  );
+}
 
 export default function AdminPage() {
-  const [stats, setStats] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [activity, setActivity] = useState(null);
-  const [tab, setTab] = useState('stats');
-  const [broadcast, setBroadcast] = useState({ title: '', body: '' });
+  const [stats, setStats]           = useState(null);
+  const [members, setMembers]       = useState([]);
+  const [activity, setActivity]     = useState(null);
+  const [tab, setTab]               = useState('stats');
+  const [broadcast, setBroadcast]   = useState({ title:'', body:'' });
   const [memberFilter, setMemberFilter] = useState('');
+  const [broadcasting, setBroadcasting] = useState(false);
 
   const fetchAll = () => {
     api.get('/api/admin/stats').then(r => setStats(r.data.stats)).catch(() => {});
@@ -24,22 +44,19 @@ export default function AdminPage() {
   const handleStatusUpdate = async (userId, status) => {
     try {
       await api.put(`/api/users/${userId}/status`, { status });
-      toast.success(`Status diubah: ${status}`);
+      toast.success(`Status: ${status}`);
       fetchAll();
-    } catch (err) {
-      toast.error('Gagal update status');
-    }
+    } catch { toast.error('Gagal update status'); }
   };
 
   const handleBroadcast = async (e) => {
     e.preventDefault();
+    setBroadcasting(true);
     try {
       const { data } = await api.post('/api/admin/broadcast', { ...broadcast, type: 'system' });
       toast.success(data.message);
-      setBroadcast({ title: '', body: '' });
-    } catch (err) {
-      toast.error('Gagal broadcast');
-    }
+      setBroadcast({ title:'', body:'' });
+    } catch { toast.error('Gagal broadcast'); } finally { setBroadcasting(false); }
   };
 
   const handleExport = async () => {
@@ -47,173 +64,202 @@ export default function AdminPage() {
       const res = await api.get('/api/admin/export', { responseType: 'blob' });
       const url = window.URL.createObjectURL(res.data);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'amandel-report.csv';
-      a.click();
-    } catch {
-      toast.error('Gagal export');
-    }
+      a.href = url; a.download = 'amandel-report.csv'; a.click();
+    } catch { toast.error('Gagal export'); }
   };
 
-  const filteredMembers = members.filter(m =>
-    !memberFilter || m.status === memberFilter
-  );
+  const filteredMembers = members.filter(m => !memberFilter || m.status === memberFilter);
 
-  const statCards = stats ? [
-    { label: 'Total Member', value: stats.memberCount, sub: `${stats.activeMembers} aktif`, color: '#00008F' },
-    { label: 'Pending Approval', value: stats.pendingMembers, color: '#FFB800' },
-    { label: 'Match Menunggu', value: stats.pendingValidate, color: '#FF1721' },
-    { label: 'Redeem Pending', value: stats.redemptionPending, color: '#00E5FF' },
-    { label: 'Event Aktif', value: stats.eventCount, color: '#00008F' },
-    { label: 'Total Poin', value: stats.totalPointsCirculating?.toLocaleString('id-ID'), color: '#FFB800' },
-  ] : [];
+  const TABS = [['stats','Dashboard'],['members','Members'],['activity','Aktivitas'],['broadcast','Broadcast']];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fadeUp">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield size={20} className="text-[#00008F]" />
-          <h1 className="font-display text-2xl font-black tracking-wide text-white">ADMIN PANEL</h1>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(20,20,255,0.15)' }}>
+            <Shield size={18} className="text-blue-400" />
+          </div>
+          <div>
+            <h1 className="font-display text-[22px] font-black tracking-wide text-white leading-none">ADMIN</h1>
+            <p className="text-[11px] text-[#8888AA]">Panel manajemen</p>
+          </div>
         </div>
         <button onClick={handleExport}
-          className="flex items-center gap-1 bg-[#111128] border border-[#2A2A4A] text-gray-300 text-xs font-bold px-3 py-1.5 rounded-lg hover:border-[#FFB800] transition">
+          className="pressable flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2.5 rounded-xl"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#8888AA' }}>
           <Download size={14} /> Export CSV
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-[#111128] border border-[#2A2A4A] rounded-xl p-1 gap-1 overflow-x-auto">
-        {[['stats', 'Dashboard'], ['members', 'Members'], ['activity', 'Aktivitas'], ['broadcast', 'Broadcast']].map(([k, l]) => (
+      <div className="flex gap-1 p-1 rounded-2xl overflow-x-auto"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)}
-            className={`flex-shrink-0 px-4 py-2 rounded-lg text-xs font-semibold transition ${tab === k ? 'bg-[#00008F] text-white' : 'text-gray-400 hover:text-white'}`}>
+            className="pressable flex-shrink-0 px-4 py-2.5 rounded-xl text-[12px] font-bold transition"
+            style={tab === k ? { background: 'linear-gradient(135deg, #1414FF, #0000CC)', color: '#fff' } : { color: '#8888AA' }}>
             {l}
           </button>
         ))}
       </div>
 
-      {/* Stats */}
-      {tab === 'stats' && (
-        <div className="grid grid-cols-2 gap-3">
-          {statCards.map(s => (
-            <div key={s.label} className="bg-[#111128] border border-[#2A2A4A] rounded-xl p-4">
-              <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-              <p className="font-mono font-black text-2xl" style={{ color: s.color }}>{s.value}</p>
-              {s.sub && <p className="text-xs text-gray-500 mt-0.5">{s.sub}</p>}
-            </div>
-          ))}
+      {/* ── Dashboard ── */}
+      {tab === 'stats' && stats && (
+        <div className="space-y-5 animate-fadeIn">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Total Member"     value={stats.memberCount}                           sub={`${stats.activeMembers} aktif`}  color="#4488FF" icon={Users}     />
+            <StatCard label="Pending Approval" value={stats.pendingMembers}                        sub="perlu disetujui"                 color="#FFB800" icon={Shield}    />
+            <StatCard label="Validasi Match"   value={stats.pendingValidate}                       sub="menunggu review"                 color="#FF1721" icon={Swords}    />
+            <StatCard label="Redeem Pending"   value={stats.redemptionPending}                     sub="perlu diproses"                  color="#00E5FF" icon={Gift}      />
+            <StatCard label="Event Aktif"      value={stats.eventCount}                            sub="sedang berjalan"                 color="#22C55E" icon={Activity}  />
+            <StatCard label="Total Poin"       value={stats.totalPointsCirculating?.toLocaleString('id-ID')} sub="beredar di komunitas" color="#A855F7" icon={Zap}       />
+          </div>
         </div>
       )}
 
-      {/* Members */}
+      {/* ── Members ── */}
       {tab === 'members' && (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fadeIn">
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {[['', 'Semua'], ['PENDING', 'Pending'], ['ACTIVE', 'Aktif'], ['BANNED', 'Banned']].map(([k, l]) => (
+            {[['','Semua'],['PENDING','Pending'],['ACTIVE','Aktif'],['INACTIVE','Inaktif'],['BANNED','Banned']].map(([k, l]) => (
               <button key={k} onClick={() => setMemberFilter(k)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${memberFilter === k ? 'bg-[#00008F] text-white' : 'bg-[#111128] border border-[#2A2A4A] text-gray-400'}`}>
+                className="pressable flex-shrink-0 px-3.5 py-2 rounded-xl text-[12px] font-bold transition"
+                style={memberFilter === k
+                  ? { background: 'linear-gradient(135deg, #1414FF, #0000CC)', color: '#fff' }
+                  : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#8888AA' }}>
                 {l}
               </button>
             ))}
           </div>
-          {filteredMembers.map(m => (
-            <div key={m.id} className="bg-[#111128] border border-[#2A2A4A] rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-white text-sm">{m.name}</p>
-                  <p className="text-xs text-gray-400">{m.email} · {m.department}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-[10px] font-bold ${STATUS_COLORS[m.status]}`}>{m.status}</span>
-                    <span className="text-[10px] text-gray-500">ID: {m.employeeId || '—'}</span>
-                    <span className="text-[10px] font-mono text-[#FFB800]">{m.totalPoints} pts</span>
+
+          {filteredMembers.length === 0 ? (
+            <div className="rounded-2xl py-10 text-center text-[#8888AA]"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              Tidak ada member
+            </div>
+          ) : filteredMembers.map(m => {
+            const ms = MEMBER_STATUS[m.status] || MEMBER_STATUS.INACTIVE;
+            return (
+              <div key={m.id} className="rounded-2xl p-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
+                    {m.name?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-bold text-white text-[13px]">{m.name}</p>
+                      <span className="text-[9px] font-black px-2 py-1 rounded-lg flex-shrink-0"
+                        style={{ color: ms.color, background: ms.bg }}>{ms.label}</span>
+                    </div>
+                    <p className="text-[11px] text-[#8888AA] truncate">{m.email}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-[#8888AA]">{m.department}</span>
+                      {m.employeeId && <span className="text-[10px] text-[#8888AA]">· {m.employeeId}</span>}
+                      <span className="text-[10px] font-mono font-bold text-[#FFB800]">{m.totalPoints} pts</span>
+                    </div>
                   </div>
                 </div>
+
+                {m.status === 'PENDING' && (
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => handleStatusUpdate(m.id, 'ACTIVE')}
+                      className="pressable flex-1 flex items-center justify-center gap-1.5 text-[12px] font-bold py-2 rounded-xl"
+                      style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', color: '#22C55E' }}>
+                      <CheckCircle size={13} /> Approve
+                    </button>
+                    <button onClick={() => handleStatusUpdate(m.id, 'BANNED')}
+                      className="pressable flex-1 flex items-center justify-center gap-1.5 text-[12px] font-bold py-2 rounded-xl"
+                      style={{ background: 'rgba(255,23,33,0.10)', border: '1px solid rgba(255,23,33,0.2)', color: '#FF6666' }}>
+                      <XCircle size={13} /> Tolak
+                    </button>
+                  </div>
+                )}
+                {m.status === 'ACTIVE' && (
+                  <button onClick={() => handleStatusUpdate(m.id, 'INACTIVE')}
+                    className="pressable w-full mt-3 text-[12px] font-bold py-2 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#8888AA' }}>
+                    Nonaktifkan
+                  </button>
+                )}
               </div>
-              {m.status === 'PENDING' && (
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => handleStatusUpdate(m.id, 'ACTIVE')}
-                    className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition">
-                    <CheckCircle size={12} /> Approve
-                  </button>
-                  <button onClick={() => handleStatusUpdate(m.id, 'BANNED')}
-                    className="flex-1 flex items-center justify-center gap-1 text-xs font-bold py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition">
-                    <XCircle size={12} /> Tolak
-                  </button>
-                </div>
-              )}
-              {m.status === 'ACTIVE' && (
-                <button onClick={() => handleStatusUpdate(m.id, 'INACTIVE')}
-                  className="w-full mt-3 text-xs font-bold py-1.5 rounded-lg bg-gray-500/10 border border-gray-500/30 text-gray-400 hover:bg-gray-500/20 transition">
-                  Nonaktifkan
-                </button>
-              )}
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Activity ── */}
+      {tab === 'activity' && activity && (
+        <div className="space-y-5 animate-fadeIn">
+          {[
+            { title:'Match Terbaru', data: activity.recentMatches, render: m => ({ main: m.eventName, sub: `${m.createdBy?.name} · ${m.format}`, right: new Date(m.createdAt).toLocaleDateString('id-ID') }) },
+            { title:'Redemption Terbaru', data: activity.recentRedemptions, render: r => ({ main: r.user?.name, sub: r.reward?.name, right: new Date(r.createdAt).toLocaleDateString('id-ID') }) },
+            { title:'Member Baru', data: activity.recentMembers, render: m => ({ main: m.name, sub: m.department, right: MEMBER_STATUS[m.status]?.label || m.status, rightColor: MEMBER_STATUS[m.status]?.color }) },
+          ].map(({ title, data, render }) => data?.length > 0 && (
+            <div key={title}>
+              <p className="text-[11px] font-bold text-[#8888AA] uppercase tracking-wider mb-2">{title}</p>
+              <div className="rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {data.map((item, i) => {
+                  const { main, sub, right, rightColor } = render(item);
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 px-4 py-3.5 border-b last:border-0"
+                      style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-white truncate">{main}</p>
+                        <p className="text-[10px] text-[#8888AA]">{sub}</p>
+                      </div>
+                      <span className="text-[10px] font-bold flex-shrink-0" style={{ color: rightColor || '#8888AA' }}>{right}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Activity */}
-      {tab === 'activity' && activity && (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 mb-2">Match Terbaru</h3>
-            <div className="space-y-2">
-              {activity.recentMatches?.map(m => (
-                <div key={m.id} className="bg-[#111128] border border-[#2A2A4A] rounded-lg px-4 py-3 flex justify-between">
-                  <div>
-                    <p className="text-sm text-white">{m.eventName}</p>
-                    <p className="text-xs text-gray-500">{m.createdBy?.name} · {m.format}</p>
-                  </div>
-                  <span className="text-xs text-gray-500 self-center">{new Date(m.createdAt).toLocaleDateString('id-ID')}</span>
-                </div>
-              ))}
+      {/* ── Broadcast ── */}
+      {tab === 'broadcast' && (
+        <div className="animate-fadeIn">
+          <div className="rounded-2xl p-5"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,184,0,0.12)' }}>
+                <Bell size={18} className="text-[#FFB800]" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-[14px]">Broadcast Notifikasi</p>
+                <p className="text-[11px] text-[#8888AA]">Kirim pesan ke semua member aktif</p>
+              </div>
             </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 mb-2">Redemption Terbaru</h3>
-            <div className="space-y-2">
-              {activity.recentRedemptions?.map(r => (
-                <div key={r.id} className="bg-[#111128] border border-[#2A2A4A] rounded-lg px-4 py-3 flex justify-between">
-                  <div>
-                    <p className="text-sm text-white">{r.user?.name}</p>
-                    <p className="text-xs text-gray-500">{r.reward?.name}</p>
-                  </div>
-                  <span className="text-xs text-gray-500 self-center">{new Date(r.createdAt).toLocaleDateString('id-ID')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 mb-2">Member Baru</h3>
-            <div className="space-y-2">
-              {activity.recentMembers?.map(m => (
-                <div key={m.id} className="bg-[#111128] border border-[#2A2A4A] rounded-lg px-4 py-3 flex justify-between">
-                  <div>
-                    <p className="text-sm text-white">{m.name}</p>
-                    <p className="text-xs text-gray-500">{m.department}</p>
-                  </div>
-                  <span className={`text-xs font-bold self-center ${STATUS_COLORS[m.status]}`}>{m.status}</span>
-                </div>
-              ))}
-            </div>
+
+            <form onSubmit={handleBroadcast} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-[#8888AA] uppercase tracking-wider mb-1.5">Judul</label>
+                <input type="text" value={broadcast.title} onChange={e => setBroadcast({...broadcast, title: e.target.value})}
+                  placeholder="Judul notifikasi" required className="input-base" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-[#8888AA] uppercase tracking-wider mb-1.5">Pesan</label>
+                <textarea value={broadcast.body} onChange={e => setBroadcast({...broadcast, body: e.target.value})}
+                  placeholder="Isi pesan broadcast..." rows={4} required className="input-base resize-none" />
+              </div>
+              <button type="submit" disabled={broadcasting}
+                className="pressable w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-xl disabled:opacity-60"
+                style={{ background: 'linear-gradient(135deg, #1414FF, #0000CC)' }}>
+                {broadcasting ? '...' : <><Bell size={15} /> KIRIM KE SEMUA MEMBER</>}
+              </button>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Broadcast */}
-      {tab === 'broadcast' && (
-        <div className="bg-[#111128] border border-[#2A2A4A] rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><Bell size={16} /> Broadcast Notifikasi</h3>
-          <form onSubmit={handleBroadcast} className="space-y-3">
-            <input type="text" value={broadcast.title} onChange={e => setBroadcast({...broadcast, title: e.target.value})} placeholder="Judul notifikasi" required
-              className="w-full bg-[#080814] border border-[#2A2A4A] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00008F]" />
-            <textarea value={broadcast.body} onChange={e => setBroadcast({...broadcast, body: e.target.value})} placeholder="Isi pesan..." rows={3} required
-              className="w-full bg-[#080814] border border-[#2A2A4A] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00008F] resize-none" />
-            <button type="submit" className="w-full bg-[#00008F] hover:bg-blue-800 text-white font-bold py-3 rounded-lg transition">
-              KIRIM KE SEMUA MEMBER
-            </button>
-          </form>
-        </div>
-      )}
+      <div className="h-2" />
     </div>
   );
 }
