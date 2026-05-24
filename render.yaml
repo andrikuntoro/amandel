@@ -11,7 +11,9 @@ services:
       - key: PORT
         value: 4000
       - key: DATABASE_URL
-        sync: false        # isi manual di Render dashboard
+        sync: false        # Supabase pooler URL (port 6543)
+      - key: DIRECT_URL
+        sync: false        # Supabase direct URL (port 5432, for migrations)
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
@@ -21,7 +23,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: FRONTEND_URL
-        sync: false        # isi setelah Netlify deploy: https://amandel.netlify.app
+        sync: false        # https://amandel.netlify.app
       - key: COMMUNITY_INVITE_CODE
         value: AMANDEL2025
       - key: AXA_EMAIL_DOMAIN
